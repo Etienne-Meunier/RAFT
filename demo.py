@@ -8,10 +8,13 @@ import glob
 import numpy as np
 import torch
 from PIL import Image
+from tqdm import tqdm
 
 from raft import RAFT
-from utils import flow_viz
+from utils import flow_viz, frame_utils
 from utils.utils import InputPadder
+from pathlib import Path
+from ipdb import set_trace
 
 
 
@@ -26,7 +29,7 @@ def load_image(imfile):
 def viz(img, flo):
     img = img[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
-    
+
     # map flow to rgb image
     flo = flow_viz.flow_to_image(flo)
     img_flo = np.concatenate([img, flo], axis=0)
@@ -50,17 +53,24 @@ def demo(args):
     with torch.no_grad():
         images = glob.glob(os.path.join(args.path, '*.png')) + \
                  glob.glob(os.path.join(args.path, '*.jpg'))
-        
+
         images = sorted(images)
-        for imfile1, imfile2 in zip(images[:-1], images[1:]):
+        for imfile1, imfile2 in tqdm(zip(images[:-1], images[1:]), total=len(images)):
             image1 = load_image(imfile1)
             image2 = load_image(imfile2)
 
             padder = InputPadder(image1.shape)
             image1, image2 = padder.pad(image1, image2)
 
-            flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)
-            viz(image1, flow_up)
+            flow_low, flow_up = model(image1, image2, iters=20, test_mode=True) # Flow Up is the upsampled version
+            
+            if args.save :
+                path = Path(args.path_save)
+                path.mkdir(parents=True, exist_ok=True)
+                flow = padder.unpad(flow_up[0]).permute(1, 2, 0).cpu().numpy()
+                frame_utils.writeFlow(imfile1.replace(args.path,args.path_save).replace('.png','.flo'), flow)
+            else :
+                viz(image1, flow_up)
 
 
 if __name__ == '__main__':
@@ -70,6 +80,9 @@ if __name__ == '__main__':
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
+    parser.add_argument('--save', action='store_true', help='save the frame instead of showing them')
+    parser.add_argument('--path_save', required='--save' in sys.argv, type=str)
+
     args = parser.parse_args()
 
     demo(args)
