@@ -1,0 +1,10 @@
+Bootstrap : docker
+From : pytorch/pytorch:1.6.0-cuda10.1-cudnn7-runtime
+
+%files 
+   requirements.txt /root/requirements.txt
+
+%post 
+   apt update -y
+   apt -y install libgl1-mesa-glx libxext6 libglib2.0-0
+   pip install -r /root/requirements.txt
