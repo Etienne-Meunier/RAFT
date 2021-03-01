@@ -1,0 +1,4 @@
+matplotlib
+tensorboard
+opencv-python
+ipdb
